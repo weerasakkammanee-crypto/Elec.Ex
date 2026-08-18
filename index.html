@@ -206,7 +206,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   // วาง URL ของ Google Apps Script Web App ที่ deploy แล้ว (ลงท้ายด้วย /exec)
   var SERVER_URL = 'https://script.google.com/macros/s/AKfycbw2Kkl7H1txnrZm1dW38xOdY2Mrsgba-B0nuzkFck4sB3FQXbn5dw-zH_P_7gOu7e_LVg/exec';
   // ต้องตรงกับ SERVER_VERSION ในไฟล์ apps_script_code.gs เสมอ
-  var EXPECTED_SERVER_VERSION = 'v1-initial-2026-08-17';
+  var EXPECTED_SERVER_VERSION = 'v2-error-messages-2026-08-18';
 
   var DEMO_QUESTIONS = JSON.parse(document.getElementById('questions-data').textContent);
   var SUBJECTS = JSON.parse(document.getElementById('subjects-data').textContent);
@@ -269,6 +269,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     user_not_found: 'ไม่พบผู้ใช้นี้ในระบบ',
     kicked: 'บัญชีนี้ถูกล็อกอินจากอุปกรณ์อื่น เซสชันนี้จึงถูกตัดออก',
     invalid_session: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
+    sheets_not_setup: 'ยังไม่พบชีตข้อมูล Users/Attempts ในสเปรดชีต — ไปที่ Apps Script editor แล้วรันฟังก์ชัน setupSheets หนึ่งครั้งก่อน',
   };
   function errMsg(code) { return ERROR_MESSAGES[code] || ('เกิดข้อผิดพลาด: ' + code); }
 
