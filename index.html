@@ -217,14 +217,14 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   // วาง URL ของ Google Apps Script Web App ที่ deploy แล้ว (ลงท้ายด้วย /exec)
   var SERVER_URL = 'https://script.google.com/macros/s/AKfycbw2Kkl7H1txnrZm1dW38xOdY2Mrsgba-B0nuzkFck4sB3FQXbn5dw-zH_P_7gOu7e_LVg/exec';
   // ต้องตรงกับ SERVER_VERSION ในไฟล์ apps_script_code.gs เสมอ
-  var EXPECTED_SERVER_VERSION = 'v5-custom-exam-2026-08-19';
+  var EXPECTED_SERVER_VERSION = 'v6-ios-fix-2026-08-19';
 
   var DEMO_QUESTIONS = JSON.parse(document.getElementById('questions-data').textContent);
   var SUBJECTS = JSON.parse(document.getElementById('subjects-data').textContent);
   var READING = JSON.parse(document.getElementById('reading-data').textContent);
   var IMG_BASE = 'assets/images/';
 
-  var SUBJECT_TOTALS = { basic: 101, rlc: 70, number: 11, circuit: 54, math: 219, english: 100, radio: 247, wire_comm: 297, computer: 63, doctrine: 80 };
+  var SUBJECT_TOTALS = { basic: 100, rlc: 66, number: 11, circuit: 54, math: 219, english: 100, radio: 247, wire_comm: 297, computer: 63, doctrine: 80 };
 
   // ================= STATE =================
   var state = {
@@ -253,19 +253,30 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   }
 
   // ================= API =================
-  function api(action, payload) {
+  // การเรียกที่อ่านข้อมูลอย่างเดียว (ไม่มีผลข้างเคียงถ้ายิงซ้ำ) — ปลอดภัยที่จะลองใหม่อัตโนมัติเมื่อเน็ตสะดุด
+  // (มือถือ โดยเฉพาะ iOS มักเจอเน็ตสะดุดชั่วครู่บ่อยกว่า — ลองใหม่เงียบๆ ช่วยลดอาการ "เชื่อมต่อไม่ได้" ที่ผู้ใช้เจอ)
+  var RETRYABLE_ACTIONS = { ping: 1, checkSession: 1, getQuestions: 1, checkAnswer: 1, getHistory: 1, adminListUsers: 1, adminListAttempts: 1 };
+  function api(action, payload, _attempt) {
     payload = payload || {};
     payload.action = action;
     if (state.user && !payload.username) { payload.username = state.user.username; payload.token = state.user.token; }
     if (!SERVER_URL || SERVER_URL.indexOf('PASTE_') === 0) {
       return Promise.resolve({ ok: false, error: 'server_not_configured' });
     }
+    var attempt = _attempt || 0;
     return fetch(SERVER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
     }).then(function (r) { return r.json(); })
-      .catch(function () { return { ok: false, error: 'network_error' }; });
+      .catch(function () {
+        if (RETRYABLE_ACTIONS[action] && attempt < 2) {
+          return new Promise(function (resolve) {
+            setTimeout(function () { resolve(api(action, payload, attempt + 1)); }, 500 * (attempt + 1));
+          });
+        }
+        return { ok: false, error: 'network_error' };
+      });
   }
 
   var ERROR_MESSAGES = {
@@ -379,7 +390,10 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
 
   // ================= RENDER ROOT =================
   var root = document.getElementById('app');
+  var lastRenderedView = null;
   function render() {
+    var viewChanged = (state.view !== lastRenderedView);
+    lastRenderedView = state.view;
     var html = brandbar();
     if (state.view === 'home') html += viewHome();
     else if (state.view === 'login') html += viewLogin();
@@ -395,6 +409,11 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     html += footerVersion();
     root.innerHTML = html;
     bindEvents();
+    // iOS Safari ไม่รองรับ scroll anchoring เหมือน Chrome/Android — ถ้าไม่ scroll ขึ้นบนเองตอนเปลี่ยนหน้า
+    // จะค้างอยู่ตำแหน่งเดิม (เช่น เลื่อนลงมาไกลจากหน้าก่อนหน้า) ทำให้เนื้อหาหน้าใหม่ดูเหมือน "อ่านไม่ได้/ว่างเปล่า"
+    if (viewChanged) {
+      window.scrollTo(0, 0);
+    }
   }
 
   function brandbar() {
@@ -427,7 +446,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
 
     if (!state.user) {
       out += '<div class="card">' +
-        '<h2>เข้าสู่ระบบเพื่อฝึกทำข้อสอบเต็มคลัง 1,242 ข้อ</h2>' +
+        '<h2>เข้าสู่ระบบเพื่อฝึกทำข้อสอบเต็มคลัง 1,237 ข้อ</h2>' +
         '<p>สมัครสมาชิกฟรี — บัญชีใหม่ต้องรอผู้ดูแลระบบอนุมัติก่อนใช้งาน</p>' +
         '<div class="btn-row">' +
         '<button class="btn btn-primary" data-go="login">เข้าสู่ระบบ</button>' +
@@ -465,7 +484,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     });
     out += '<div class="subject-card" data-action="practiceSubject" data-subject="all">' +
       '<div class="subject-icon">🗂️</div><div class="subject-name">ทุกหมวดวิชา</div>' +
-      '<div class="subject-count">1,242 ข้อ</div></div>';
+      '<div class="subject-count">1,237 ข้อ</div></div>';
     out += '</div></div>';
 
     out += '<div class="card"><h2>📖 เนื้อหาอ่านทบทวน</h2><p>สรุปเนื้อหา ' + READING.length + ' เรื่อง อ่านทบทวนก่อนสอบ</p>' +
@@ -510,25 +529,22 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   // ================= VIEW: PRACTICE SETUP =================
   var practiceCtx = { subject: 'all' };
   function viewPracticeSetup() {
-    var max = practiceCtx.subject === 'all' ? 1242 : (SUBJECT_TOTALS[practiceCtx.subject] || 0);
+    var max = practiceCtx.subject === 'all' ? 1237 : (SUBJECT_TOTALS[practiceCtx.subject] || 0);
     var options = [10, 20, 30].filter(function (n) { return n < max; });
     var defaultCount = Math.min(20, max);
     return '<div class="card">' +
       '<h2>ฝึกทำ: ' + esc(practiceCtx.subject === 'all' ? 'ทุกหมวดวิชา' : subjectName(practiceCtx.subject)) + '</h2>' +
-      '<p>เลือกจำนวนข้อที่ต้องการฝึก (ไม่จับเวลา ดูเฉลยได้ทันที)</p>' +
-      '<div class="btn-row">' +
-      options.map(function (n) { return '<button class="btn" data-action="startPractice" data-count="' + n + '">' + n + ' ข้อ</button>'; }).join('') +
-      '<button class="btn btn-primary" data-action="startPractice" data-count="' + max + '">ทั้งหมด (' + max + ' ข้อ)</button>' +
-      '</div>' +
-      '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">' +
-      '<p class="muted" style="margin-bottom:10px">หรือกำหนดจำนวนข้อ/เวลาเอง</p>' +
+      '<p>กำหนดจำนวนข้อ (และเวลา ถ้าต้องการจับเวลาด้วย) แล้วกด "เริ่มฝึกทำ" — ผู้เข้ารับการทดสอบเป็นผู้กดเริ่มเอง</p>' +
       '<div class="field"><label>จำนวนข้อ (สูงสุด ' + max + ' ข้อ)</label>' +
       '<input id="f-practice-count" type="number" min="1" max="' + max + '" value="' + defaultCount + '"></div>' +
+      '<div class="btn-row" style="margin-bottom:16px">' +
+      options.map(function (n) { return '<button type="button" class="btn" data-action="fillPracticeCount" data-count="' + n + '">' + n + ' ข้อ</button>'; }).join('') +
+      '<button type="button" class="btn" data-action="fillPracticeCount" data-count="' + max + '">ทั้งหมด (' + max + ' ข้อ)</button>' +
+      '</div>' +
       '<div class="field" style="display:flex;align-items:center;gap:8px;flex-direction:row">' +
       '<input id="f-practice-timed" type="checkbox" style="width:auto"> <label for="f-practice-timed" style="margin:0">จับเวลาด้วย (นาที)</label>' +
       '<input id="f-practice-minutes" type="number" min="1" value="20" style="width:90px"></div>' +
-      '<button class="btn btn-primary" data-action="startPracticeCustom">เริ่มฝึกทำ (กำหนดเอง)</button>' +
-      '</div>' +
+      '<button class="btn btn-primary btn-block" data-action="startPracticeCustom">▶ เริ่มฝึกทำ</button>' +
       '<div style="margin-top:14px"><button class="btn btn-ghost" data-go="home">‹ กลับ</button></div>' +
       '</div>';
   }
@@ -540,7 +556,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   }
 
   function startPracticeCustom() {
-    var max = practiceCtx.subject === 'all' ? 1242 : (SUBJECT_TOTALS[practiceCtx.subject] || 0);
+    var max = practiceCtx.subject === 'all' ? 1237 : (SUBJECT_TOTALS[practiceCtx.subject] || 0);
     var count = parseInt(document.getElementById('f-practice-count').value, 10);
     if (!count || count < 1) count = 1;
     if (count > max) count = max;
@@ -617,6 +633,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
       reveals: {}, // id -> {answer, reasoning} — เฉลย+เหตุผลที่เปิดเผยแล้วทีละข้อ (โหมดฝึกทำ)
       startedAt: new Date().toISOString(),
       timeLimitSec: timeLimitSec,
+      deadline: timeLimitSec ? (Date.now() + timeLimitSec * 1000) : null,
       remainingSec: timeLimitSec,
       showFeedback: mode === 'practice', // ฝึกทำ: ดูเฉลยได้ทันทีหลังเลือก
       timerHandle: null,
@@ -629,44 +646,62 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
 
   function startTimer() {
     if (state.quiz.timerHandle) clearInterval(state.quiz.timerHandle);
-    state.quiz.timerHandle = setInterval(function () {
-      if (!state.quiz) return;
-      state.quiz.remainingSec--;
-      if (state.quiz.remainingSec <= 0) {
-        clearInterval(state.quiz.timerHandle);
-        finishQuiz();
-        return;
-      }
-      var t = document.getElementById('quiz-timer');
-      if (t) {
-        t.textContent = fmtTime(state.quiz.remainingSec);
-        t.className = 'timer' + (state.quiz.remainingSec < 60 ? ' low' : '');
-      }
-    }, 1000);
+    state.quiz.timerHandle = setInterval(tickTimer, 1000);
+  }
+  // คำนวณเวลาที่เหลือจาก deadline (นาฬิกาจริง) แทนการนับถอยหลังทีละวินาที
+  // เพราะมือถือ (โดยเฉพาะ iOS) มักหน่วง/ข้าม setInterval เวลาสลับแอปหรือพับหน้าจอ
+  // ถ้านับถอยหลังแบบเดิมจะทำให้เวลานาฬิกาคลาดเคลื่อนจากเวลาจริงได้มาก ("หน่วง"/ไม่ตรง)
+  function tickTimer() {
+    if (!state.quiz || !state.quiz.deadline) return;
+    var remaining = Math.max(0, Math.round((state.quiz.deadline - Date.now()) / 1000));
+    state.quiz.remainingSec = remaining;
+    if (remaining <= 0) {
+      clearInterval(state.quiz.timerHandle);
+      finishQuiz();
+      return;
+    }
+    var t = document.getElementById('quiz-timer');
+    if (t) {
+      t.textContent = fmtTime(remaining);
+      t.className = 'timer' + (remaining < 60 ? ' low' : '');
+    }
   }
   function fmtTime(sec) {
     var m = Math.floor(sec / 60), s = sec % 60;
     return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
   }
 
+  // เหตุผลที่ถือว่าเซสชันถูกตัดออกจริง ๆ (server ยืนยันชัดเจนว่าบัญชีถูกล็อกอินที่อื่น/ถูกระงับ/ไม่พบผู้ใช้)
+  // ข้อผิดพลาดชั่วคราว (เน็ตหลุด, เซิร์ฟเวอร์ตอบช้า/error ชั่วคราว) จะ "ไม่" ทำให้ถูกตัดออกจากระบบ
+  // เพื่อป้องกันไม่ให้ผู้ใช้ถูกเตะออกกลางคันทั้งที่ไม่ได้ล็อกอินที่อื่นจริง
+  var TERMINAL_KICK_REASONS = { kicked: 1, suspended: 1, invalid_session: 1 };
   function startSessionPoll() {
     stopSessionPoll();
+    state.sessionPollFailStreak = 0;
     state.sessionPoll = setInterval(function () {
       if (!state.user) return;
       api('checkSession', {}).then(function (res) {
-        if (!res.ok) { handleKicked(); }
+        if (res.ok) { state.sessionPollFailStreak = 0; return; }
+        if (!TERMINAL_KICK_REASONS[res.error]) {
+          // network_error / server_error / sheets_not_setup ฯลฯ — ปัญหาชั่วคราว ลองใหม่รอบถัดไป ไม่ตัดออก
+          return;
+        }
+        // ยืนยันซ้ำก่อนตัดออกจริง กันกรณี Sheets อ่านข้อมูลสะดุดชั่วครู่แล้วรายงานผลผิดแบบต่อเนื่องผิดจังหวะ
+        state.sessionPollFailStreak = (state.sessionPollFailStreak || 0) + 1;
+        if (state.sessionPollFailStreak >= 2) { handleKicked(res.error); }
       });
-    }, 15000);
+    }, 30000); // เดิม 15 วิ ลดความถี่ลงครึ่งหนึ่งเพื่อลดจำนวนการเชื่อมต่อพื้นหลังที่แย่งกับ request จริงของผู้ใช้ (โดยเฉพาะบนเน็ตมือถือ/iOS ที่สะดุดง่าย)
   }
   function stopSessionPoll() {
     if (state.sessionPoll) { clearInterval(state.sessionPoll); state.sessionPoll = null; }
+    state.sessionPollFailStreak = 0;
   }
-  function handleKicked() {
+  function handleKicked(reason) {
     stopSessionPoll();
     if (state.quiz && state.quiz.timerHandle) clearInterval(state.quiz.timerHandle);
     state.user = null; saveSession();
     state.quiz = null;
-    state.error = errMsg('kicked');
+    state.error = errMsg(reason === 'suspended' ? 'suspended' : (reason === 'invalid_session' ? 'invalid_session' : 'kicked'));
     state.view = 'home';
     render();
   }
@@ -1031,7 +1066,11 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     if (action === 'examSelectNone') { document.querySelectorAll('.exam-subj-checkbox').forEach(function (c) { c.checked = false; }); return; }
     if (action === 'practiceSubject') { practiceCtx.subject = el.getAttribute('data-subject'); state.view = 'practiceSetup'; render(); return; }
     if (action === 'openReading') { readingCtx.id = el.getAttribute('data-id'); state.view = 'readingDetail'; render(); return; }
-    if (action === 'startPractice') { startPractice(parseInt(el.getAttribute('data-count'), 10)); return; }
+    if (action === 'fillPracticeCount') {
+      var fpc = document.getElementById('f-practice-count');
+      if (fpc) fpc.value = el.getAttribute('data-count');
+      return;
+    }
     if (action === 'startPracticeCustom') { startPracticeCustom(); return; }
     if (action === 'selectChoice') { selectChoice(parseInt(el.getAttribute('data-i'), 10)); return; }
     if (action === 'nextQ') { state.quiz.idx++; render(); return; }
@@ -1099,6 +1138,11 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   }
 
   // ================= BOOT =================
+  // เวลากลับมาเปิดแอปอีกครั้ง (สลับแอป/ล็อกจอ) รีเฟรชนาฬิกาจับเวลาทันที แทนที่จะรอ setInterval ติ๊กถัดไป
+  // ซึ่งบน iOS อาจถูกหน่วงไว้นานจนตัวเลขที่โชว์ค้างไม่ตรงกับเวลาจริง
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && state.quiz && state.quiz.timerHandle) { tickTimer(); }
+  });
   loadSession();
   render();
   checkVersion();
