@@ -438,7 +438,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
         '<button class="btn btn-copper" data-action="startDemo">เริ่มทำแบบทดสอบตัวอย่าง</button>' +
         '</div>';
       out += '<div class="card"><h3>📖 เนื้อหาอ่านทบทวน</h3>' +
-        '<p>สรุปเนื้อหา ' + READING.length + ' เรื่อง อ่านได้ฟรีไม่ต้องเข้าสู่ระบบ</p>' +
+        '<p>สรุปเนื้อหา ' + READING.length + ' เรื่อง — อ่านตัวอย่างฟรี เข้าสู่ระบบเพื่ออ่านเต็ม</p>' +
         '<button class="btn" data-go="readingList">ดูเนื้อหาอ่านทบทวน</button></div>';
       out += '<div class="center"><button class="link-btn" data-go="admin">⚙️ สำหรับผู้ดูแลระบบ</button></div>';
       return out;
@@ -814,14 +814,36 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     return html;
   }
 
+  // สมาชิกที่ล็อกอินได้แล้ว (state.user มีค่า) คือผ่านการอนุมัติจากแอดมินแล้วเสมอ
+  // (บัญชีที่ยังรออนุมัติจะถูกกันไม่ให้ล็อกอินสำเร็จตั้งแต่ขั้นตอน login)
+  var READING_PREVIEW_RATIO = 0.35; // สัดส่วนเนื้อหาที่เปิดให้อ่านฟรีก่อนสมัคร/ล็อกอิน
+
+  function truncateMarkdown(md, ratio) {
+    var blocks = (md || '').split(/\n\s*\n/);
+    var totalLen = md.length;
+    var limit = Math.max(400, Math.floor(totalLen * ratio));
+    var acc = '';
+    for (var i = 0; i < blocks.length; i++) {
+      var next = acc ? acc + '\n\n' + blocks[i] : blocks[i];
+      if (acc && next.length > limit) break;
+      acc = next;
+    }
+    return acc;
+  }
+
   function viewReadingList() {
+    var locked = !state.user;
     var out = '<div class="card"><h2>📖 เนื้อหาอ่านทบทวน</h2>' +
-      '<p class="muted">สรุปเนื้อหาเพื่ออ่านทบทวนก่อนสอบ แยกตามเรื่อง ไม่ต้องเข้าสู่ระบบก็อ่านได้</p>' +
+      '<p class="muted">' + (locked ?
+        'อ่านตัวอย่างได้ฟรีทุกเรื่อง — เข้าสู่ระบบด้วยบัญชีที่แอดมินอนุมัติแล้วเพื่ออ่านเนื้อหาเต็ม' :
+        'สรุปเนื้อหาเพื่ออ่านทบทวนก่อนสอบ แยกตามเรื่อง') + '</p>' +
       '<div class="subject-grid">';
     READING.forEach(function (r) {
       out += '<div class="subject-card" data-action="openReading" data-id="' + r.id + '">' +
         '<div class="subject-icon">' + r.icon + '</div>' +
-        '<div class="subject-name">' + esc(r.title) + '</div></div>';
+        '<div class="subject-name">' + esc(r.title) + '</div>' +
+        (locked ? '<div class="subject-count">🔒 อ่านได้บางส่วน</div>' : '<div class="subject-count">🔓 อ่านเต็ม</div>') +
+        '</div>';
     });
     out += '</div>' +
       '<div style="margin-top:16px"><button class="btn" data-go="home">‹ กลับ</button></div></div>';
@@ -831,10 +853,19 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   function viewReadingDetail() {
     var r = READING.filter(function (x) { return x.id === readingCtx.id; })[0];
     if (!r) { state.view = 'readingList'; return viewReadingList(); }
+    var locked = !state.user;
+    var bodyMd = locked ? truncateMarkdown(r.body, READING_PREVIEW_RATIO) : r.body;
     var out = '<div class="card reading-article">' +
-      '<h2>' + r.icon + ' ' + esc(r.title) + '</h2>' +
-      '<div class="reading-body">' + mdToHtml(r.body) + '</div>' +
-      '<div style="margin-top:18px"><button class="btn" data-go="readingList">‹ กลับไปเลือกเรื่องอื่น</button></div>' +
+      '<h2>' + r.icon + ' ' + esc(r.title) + (locked ? ' <span class="muted" style="font-size:0.6em;font-weight:400">(ตัวอย่าง)</span>' : '') + '</h2>' +
+      '<div class="reading-body">' + mdToHtml(bodyMd) + '</div>';
+    if (locked) {
+      out += '<div class="card" style="background:rgba(47,220,132,0.06);border:1px dashed var(--pcb-dim);margin-top:16px;padding:16px">' +
+        '<div style="font-weight:600;margin-bottom:6px">🔒 อ่านเนื้อหาเต็มได้เมื่อเข้าสู่ระบบ</div>' +
+        '<p class="muted" style="margin-bottom:12px">สมัครสมาชิกฟรี — หลังแอดมินอนุมัติบัญชีแล้วจะอ่านเนื้อหาทุกเรื่องได้เต็มรูปแบบ พร้อมฝึกทำข้อสอบและดูเหตุผลประกอบเฉลย</p>' +
+        '<div class="btn-row"><button class="btn btn-primary" data-go="login">เข้าสู่ระบบ</button>' +
+        '<button class="btn" data-go="register">สมัครสมาชิก</button></div></div>';
+    }
+    out += '<div style="margin-top:18px"><button class="btn" data-go="readingList">‹ กลับไปเลือกเรื่องอื่น</button></div>' +
       '</div>';
     return out;
   }
