@@ -217,7 +217,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   // วาง URL ของ Google Apps Script Web App ที่ deploy แล้ว (ลงท้ายด้วย /exec)
   var SERVER_URL = 'https://script.google.com/macros/s/AKfycbw2Kkl7H1txnrZm1dW38xOdY2Mrsgba-B0nuzkFck4sB3FQXbn5dw-zH_P_7gOu7e_LVg/exec';
   // ต้องตรงกับ SERVER_VERSION ในไฟล์ apps_script_code.gs เสมอ
-  var EXPECTED_SERVER_VERSION = 'v4-1242-2026-08-18';
+  var EXPECTED_SERVER_VERSION = 'v5-custom-exam-2026-08-19';
 
   var DEMO_QUESTIONS = JSON.parse(document.getElementById('questions-data').textContent);
   var SUBJECTS = JSON.parse(document.getElementById('subjects-data').textContent);
@@ -391,6 +391,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     else if (state.view === 'admin') html += viewAdmin();
     else if (state.view === 'readingList') html += viewReadingList();
     else if (state.view === 'readingDetail') html += viewReadingDetail();
+    else if (state.view === 'examSetup') html += viewExamSetup();
     html += footerVersion();
     root.innerHTML = html;
     bindEvents();
@@ -450,8 +451,8 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
       '</div>';
 
     out += '<div class="card"><h2>🎯 โหมดจำลองสอบ</h2>' +
-      '<p>สุ่มข้อสอบครบทุกหมวด จับเวลา เหมาะสำหรับซ้อมสอบจริง</p>' +
-      '<button class="btn btn-primary btn-block" data-action="startExam">เริ่มจำลองสอบ (50 ข้อ / 60 นาที)</button>' +
+      '<p>ปรับจำนวนข้อ เวลาจับ และเลือกวิชาที่ต้องการสอบได้เอง (ค่าเริ่มต้น 50 ข้อ / 60 นาที / ทุกวิชา)</p>' +
+      '<button class="btn btn-primary btn-block" data-go="examSetup">ตั้งค่าและเริ่มจำลองสอบ</button>' +
       '</div>';
 
     out += '<div class="card"><h2>📘 โหมดฝึกทำ</h2><p>เลือกหมวดวิชาที่ต้องการฝึก ไม่จับเวลา ดูเฉลยได้ทันที</p>' +
@@ -511,12 +512,22 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   function viewPracticeSetup() {
     var max = practiceCtx.subject === 'all' ? 1242 : (SUBJECT_TOTALS[practiceCtx.subject] || 0);
     var options = [10, 20, 30].filter(function (n) { return n < max; });
+    var defaultCount = Math.min(20, max);
     return '<div class="card">' +
       '<h2>ฝึกทำ: ' + esc(practiceCtx.subject === 'all' ? 'ทุกหมวดวิชา' : subjectName(practiceCtx.subject)) + '</h2>' +
-      '<p>เลือกจำนวนข้อที่ต้องการฝึก</p>' +
+      '<p>เลือกจำนวนข้อที่ต้องการฝึก (ไม่จับเวลา ดูเฉลยได้ทันที)</p>' +
       '<div class="btn-row">' +
       options.map(function (n) { return '<button class="btn" data-action="startPractice" data-count="' + n + '">' + n + ' ข้อ</button>'; }).join('') +
       '<button class="btn btn-primary" data-action="startPractice" data-count="' + max + '">ทั้งหมด (' + max + ' ข้อ)</button>' +
+      '</div>' +
+      '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">' +
+      '<p class="muted" style="margin-bottom:10px">หรือกำหนดจำนวนข้อ/เวลาเอง</p>' +
+      '<div class="field"><label>จำนวนข้อ (สูงสุด ' + max + ' ข้อ)</label>' +
+      '<input id="f-practice-count" type="number" min="1" max="' + max + '" value="' + defaultCount + '"></div>' +
+      '<div class="field" style="display:flex;align-items:center;gap:8px;flex-direction:row">' +
+      '<input id="f-practice-timed" type="checkbox" style="width:auto"> <label for="f-practice-timed" style="margin:0">จับเวลาด้วย (นาที)</label>' +
+      '<input id="f-practice-minutes" type="number" min="1" value="20" style="width:90px"></div>' +
+      '<button class="btn btn-primary" data-action="startPracticeCustom">เริ่มฝึกทำ (กำหนดเอง)</button>' +
       '</div>' +
       '<div style="margin-top:14px"><button class="btn btn-ghost" data-go="home">‹ กลับ</button></div>' +
       '</div>';
@@ -528,21 +539,71 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     beginQuiz(shuffleArr(DEMO_QUESTIONS).map(function (q) { return q; }), 'practice', 'demo', null);
   }
 
-  function startPractice(count) {
+  function startPracticeCustom() {
+    var max = practiceCtx.subject === 'all' ? 1242 : (SUBJECT_TOTALS[practiceCtx.subject] || 0);
+    var count = parseInt(document.getElementById('f-practice-count').value, 10);
+    if (!count || count < 1) count = 1;
+    if (count > max) count = max;
+    var timed = document.getElementById('f-practice-timed').checked;
+    var minutes = parseInt(document.getElementById('f-practice-minutes').value, 10);
+    if (!minutes || minutes < 1) minutes = 1;
+    startPractice(count, timed ? minutes * 60 : null);
+  }
+
+  function startPractice(count, timeLimitSec) {
     state.error = '';
     api('getQuestions', { mode: 'practice', subject: practiceCtx.subject, count: count }).then(function (res) {
       if (!res.ok) { state.error = errMsg(res.error); state.view = 'home'; render(); return; }
       state.isDemo = false;
-      beginQuiz(res.questions, 'practice', practiceCtx.subject, null);
+      beginQuiz(res.questions, 'practice', practiceCtx.subject, timeLimitSec || null);
     });
   }
 
-  function startExam() {
+  // ================= VIEW: EXAM SETUP (จำลองสอบ ปรับจำนวนข้อ/เวลา/วิชาเอง) =================
+  function viewExamSetup() {
+    var totalAll = SUBJECTS.reduce(function (sum, s) { return sum + (SUBJECT_TOTALS[s.id] || 0); }, 0);
+    var out = '<div class="card"><h2>🎯 ตั้งค่าจำลองสอบ</h2>';
+    out += '<div class="field"><label>เลือกวิชาที่ต้องการสอบ</label>' +
+      '<div class="btn-row" style="margin-bottom:10px">' +
+      '<button class="btn" data-action="examSelectAll">เลือกทุกวิชา</button>' +
+      '<button class="btn" data-action="examSelectNone">ไม่เลือกเลย</button>' +
+      '</div>' +
+      '<div class="subject-grid">';
+    SUBJECTS.forEach(function (s) {
+      out += '<label class="subject-card" style="display:flex;align-items:center;gap:10px;cursor:pointer">' +
+        '<input type="checkbox" class="exam-subj-checkbox" data-subject="' + s.id + '" checked style="width:auto">' +
+        '<div>' + s.icon + ' ' + esc(s.name) + '<div class="subject-count">' + (SUBJECT_TOTALS[s.id] || 0) + ' ข้อ</div></div>' +
+        '</label>';
+    });
+    out += '</div></div>';
+    out += '<div class="field"><label>จำนวนข้อสอบ (มีในคลังรวมสูงสุด ' + totalAll + ' ข้อ — ถ้าใส่เกินจำนวนที่มีจริงในวิชาที่เลือก ระบบจะปรับให้อัตโนมัติ)</label>' +
+      '<input id="f-exam-count" type="number" min="1" value="50"></div>';
+    out += '<div class="field"><label>เวลาที่ใช้สอบ (นาที)</label>' +
+      '<input id="f-exam-minutes" type="number" min="1" value="60"></div>';
+    out += '<div class="btn-row" style="margin-top:10px">' +
+      '<button class="btn btn-primary" data-action="startExamCustom">เริ่มจำลองสอบ</button>' +
+      '<button class="btn btn-ghost" data-go="home">‹ กลับ</button>' +
+      '</div></div>';
+    return out;
+  }
+
+  function startExamCustom() {
+    var checked = Array.prototype.slice.call(document.querySelectorAll('.exam-subj-checkbox:checked'))
+      .map(function (el) { return el.getAttribute('data-subject'); });
+    if (!checked.length) { state.error = 'กรุณาเลือกอย่างน้อย 1 วิชา'; state.view = 'examSetup'; render(); return; }
+    var count = parseInt(document.getElementById('f-exam-count').value, 10);
+    if (!count || count < 1) count = 1;
+    var minutes = parseInt(document.getElementById('f-exam-minutes').value, 10);
+    if (!minutes || minutes < 1) minutes = 1;
+    startExam(checked, count, minutes);
+  }
+
+  function startExam(subjects, count, minutes) {
     state.error = '';
-    api('getQuestions', { mode: 'exam', count: 50 }).then(function (res) {
+    api('getQuestions', { mode: 'exam', subjects: subjects, count: count }).then(function (res) {
       if (!res.ok) { state.error = errMsg(res.error); state.view = 'home'; render(); return; }
       state.isDemo = false;
-      beginQuiz(res.questions, 'exam', 'all', 60 * 60);
+      beginQuiz(res.questions, 'exam', (subjects && subjects.length === 1) ? subjects[0] : 'all', minutes * 60);
     });
   }
 
@@ -965,10 +1026,13 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     if (action === 'doLogin') { doLogin(); return; }
     if (action === 'doRegister') { doRegister(); return; }
     if (action === 'logout') { doLogout(); return; }
-    if (action === 'startExam') { startExam(); return; }
+    if (action === 'startExamCustom') { startExamCustom(); return; }
+    if (action === 'examSelectAll') { document.querySelectorAll('.exam-subj-checkbox').forEach(function (c) { c.checked = true; }); return; }
+    if (action === 'examSelectNone') { document.querySelectorAll('.exam-subj-checkbox').forEach(function (c) { c.checked = false; }); return; }
     if (action === 'practiceSubject') { practiceCtx.subject = el.getAttribute('data-subject'); state.view = 'practiceSetup'; render(); return; }
     if (action === 'openReading') { readingCtx.id = el.getAttribute('data-id'); state.view = 'readingDetail'; render(); return; }
     if (action === 'startPractice') { startPractice(parseInt(el.getAttribute('data-count'), 10)); return; }
+    if (action === 'startPracticeCustom') { startPracticeCustom(); return; }
     if (action === 'selectChoice') { selectChoice(parseInt(el.getAttribute('data-i'), 10)); return; }
     if (action === 'nextQ') { state.quiz.idx++; render(); return; }
     if (action === 'prevQ') { state.quiz.idx--; render(); return; }
