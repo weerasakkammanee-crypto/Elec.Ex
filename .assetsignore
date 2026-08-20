@@ -1,0 +1,6 @@
+server/
+README.md
+app.js
+app_shell.html
+wrangler.jsonc
+.assetsignore
