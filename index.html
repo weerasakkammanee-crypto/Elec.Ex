@@ -217,14 +217,14 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   // วาง URL ของ Google Apps Script Web App ที่ deploy แล้ว (ลงท้ายด้วย /exec)
   var SERVER_URL = 'https://script.google.com/macros/s/AKfycbw2Kkl7H1txnrZm1dW38xOdY2Mrsgba-B0nuzkFck4sB3FQXbn5dw-zH_P_7gOu7e_LVg/exec';
   // ต้องตรงกับ SERVER_VERSION ในไฟล์ apps_script_code.gs เสมอ
-  var EXPECTED_SERVER_VERSION = 'v6-ios-fix-2026-08-19';
+  var EXPECTED_SERVER_VERSION = 'v7-image-cleanup-2026-08-19';
 
   var DEMO_QUESTIONS = JSON.parse(document.getElementById('questions-data').textContent);
   var SUBJECTS = JSON.parse(document.getElementById('subjects-data').textContent);
   var READING = JSON.parse(document.getElementById('reading-data').textContent);
   var IMG_BASE = 'assets/images/';
 
-  var SUBJECT_TOTALS = { basic: 100, rlc: 66, number: 11, circuit: 54, math: 219, english: 100, radio: 247, wire_comm: 297, computer: 63, doctrine: 80 };
+  var SUBJECT_TOTALS = { basic: 92, rlc: 60, number: 11, circuit: 53, math: 219, english: 100, radio: 243, wire_comm: 297, computer: 63, doctrine: 80 };
 
   // ================= STATE =================
   var state = {
@@ -446,7 +446,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
 
     if (!state.user) {
       out += '<div class="card">' +
-        '<h2>เข้าสู่ระบบเพื่อฝึกทำข้อสอบเต็มคลัง 1,237 ข้อ</h2>' +
+        '<h2>เข้าสู่ระบบเพื่อฝึกทำข้อสอบเต็มคลัง 1,218 ข้อ</h2>' +
         '<p>สมัครสมาชิกฟรี — บัญชีใหม่ต้องรอผู้ดูแลระบบอนุมัติก่อนใช้งาน</p>' +
         '<div class="btn-row">' +
         '<button class="btn btn-primary" data-go="login">เข้าสู่ระบบ</button>' +
@@ -484,7 +484,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     });
     out += '<div class="subject-card" data-action="practiceSubject" data-subject="all">' +
       '<div class="subject-icon">🗂️</div><div class="subject-name">ทุกหมวดวิชา</div>' +
-      '<div class="subject-count">1,237 ข้อ</div></div>';
+      '<div class="subject-count">1,218 ข้อ</div></div>';
     out += '</div></div>';
 
     out += '<div class="card"><h2>📖 เนื้อหาอ่านทบทวน</h2><p>สรุปเนื้อหา ' + READING.length + ' เรื่อง อ่านทบทวนก่อนสอบ</p>' +
@@ -529,7 +529,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   // ================= VIEW: PRACTICE SETUP =================
   var practiceCtx = { subject: 'all' };
   function viewPracticeSetup() {
-    var max = practiceCtx.subject === 'all' ? 1237 : (SUBJECT_TOTALS[practiceCtx.subject] || 0);
+    var max = practiceCtx.subject === 'all' ? 1218 : (SUBJECT_TOTALS[practiceCtx.subject] || 0);
     var options = [10, 20, 30].filter(function (n) { return n < max; });
     var defaultCount = Math.min(20, max);
     return '<div class="card">' +
@@ -556,7 +556,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   }
 
   function startPracticeCustom() {
-    var max = practiceCtx.subject === 'all' ? 1237 : (SUBJECT_TOTALS[practiceCtx.subject] || 0);
+    var max = practiceCtx.subject === 'all' ? 1218 : (SUBJECT_TOTALS[practiceCtx.subject] || 0);
     var count = parseInt(document.getElementById('f-practice-count').value, 10);
     if (!count || count < 1) count = 1;
     if (count > max) count = max;
