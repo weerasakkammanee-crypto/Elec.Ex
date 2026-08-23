@@ -405,7 +405,6 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     if (state.view === 'home') html += viewHome();
     else if (state.view === 'login') html += viewLogin();
     else if (state.view === 'register') html += viewRegister();
-    else if (state.view === 'register_success') html += viewRegisterSuccess();
     else if (state.view === 'practiceSetup') html += viewPracticeSetup();
     else if (state.view === 'quiz') html += viewQuiz();
     else if (state.view === 'result') html += viewResult();
@@ -520,6 +519,24 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   }
 
   function viewRegister() {
+    var qrPanel = '<div class="qr-panel">' +
+      '<img src="' + LINE_OA_QR_DATAURI + '" alt="LINE OA QR code">' +
+      '<a class="btn btn-primary btn-block" href="' + LINE_OA_URL + '" target="_blank" rel="noopener">+ เพิ่มเพื่อน LINE OA</a>' +
+      '</div>';
+
+    if (state.justRegistered) {
+      var username = state.lastRegisteredUsername || '';
+      return '<div class="card">' +
+        '<h2>✅ สมัครสมาชิกสำเร็จ</h2>' +
+        '<div class="success-box">📱 ขั้นตอนต่อไป: แอดไลน์เพื่อแจ้ง username และขอปลดล็อกการเข้าใช้งาน</div>' +
+        '<p>สแกน QR ด้านล่าง หรือกดปุ่มเพื่อแอดเพื่อน แล้วพิมพ์ username ที่สมัครไว้' +
+        (username ? (' (<span class="username-chip">' + esc(username) + '</span>)') : '') +
+        ' พร้อมส่งรูปสลิปโอนเงินในแชท เพื่อขอปลดล็อกการเข้าใช้งานได้เลย</p>' +
+        qrPanel +
+        '<p style="margin-top:14px"><button class="link-btn" data-go="login">← กลับไปเข้าสู่ระบบ</button></p>' +
+        '</div>';
+    }
+
     return '<div class="card">' +
       '<h2>สมัครสมาชิก</h2>' +
       (state.error ? '<div class="error-box">' + esc(state.error) + '</div>' : '') +
@@ -530,23 +547,8 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
       '<button class="btn btn-primary" data-action="doRegister">สมัครสมาชิก</button>' +
       '<button class="btn btn-ghost" data-go="home">ยกเลิก</button>' +
       '</div>' +
-      '<p class="muted" style="margin-top:14px">หลังสมัครแล้วบัญชีจะอยู่ในสถานะรออนุมัติ กรุณาติดต่อผู้ดูแลระบบเพื่อเปิดใช้งาน</p>' +
-      '</div>';
-  }
-
-  function viewRegisterSuccess() {
-    var username = state.lastRegisteredUsername || '';
-    return '<div class="card">' +
-      '<h2>✅ สมัครสมาชิกสำเร็จ</h2>' +
-      '<div class="success-box">📱 ขั้นตอนต่อไป: แอดไลน์เพื่อแจ้ง username และขอปลดล็อกการเข้าใช้งาน</div>' +
-      '<p>สแกน QR ด้านล่าง หรือกดปุ่มเพื่อแอดเพื่อน แล้วพิมพ์ username ที่สมัครไว้' +
-      (username ? (' (<span class="username-chip">' + esc(username) + '</span>)') : '') +
-      ' พร้อมส่งรูปสลิปโอนเงินในแชท เพื่อขอปลดล็อกการเข้าใช้งานได้เลย</p>' +
-      '<div class="qr-panel">' +
-      '<img src="' + LINE_OA_QR_DATAURI + '" alt="LINE OA QR code">' +
-      '<a class="btn btn-primary btn-block" href="' + LINE_OA_URL + '" target="_blank" rel="noopener">+ เพิ่มเพื่อน LINE OA</a>' +
-      '</div>' +
-      '<p style="margin-top:14px"><button class="link-btn" data-go="login">← กลับไปเข้าสู่ระบบ</button></p>' +
+      '<p class="muted" style="margin-top:14px">หลังสมัครแล้วบัญชีจะอยู่ในสถานะรออนุมัติ — แอดไลน์เพื่อแจ้ง username และส่งสลิปโอนเงิน เพื่อขอปลดล็อกการเข้าใช้งาน</p>' +
+      qrPanel +
       '</div>';
   }
 
@@ -1073,7 +1075,7 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
   // ================= EVENT BINDING =================
   function bindEvents() {
     root.querySelectorAll('[data-go]').forEach(function (el) {
-      el.addEventListener('click', function () { state.error = ''; state.view = el.getAttribute('data-go'); render(); if (state.view === 'history') loadHistory(); });
+      el.addEventListener('click', function () { state.error = ''; state.view = el.getAttribute('data-go'); if (state.view === 'register') state.justRegistered = false; render(); if (state.view === 'history') loadHistory(); });
     });
     root.querySelectorAll('[data-action]').forEach(function (el) {
       el.addEventListener('click', function () { handleAction(el.getAttribute('data-action'), el); });
@@ -1146,7 +1148,8 @@ th{font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-trans
     api('register', { username: username, password: password }).then(function (res) {
       if (!res.ok) { state.error = errMsg(res.error); render(); return; }
       state.lastRegisteredUsername = username;
-      state.view = 'register_success';
+      state.justRegistered = true;
+      state.view = 'register';
       state.error = '';
       render();
     });
